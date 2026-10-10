@@ -1,0 +1,21 @@
+{
+  "name": "bus_mismatch",
+  "component_count": 4,
+  "component_refs": [
+    "C1",
+    "J1",
+    "R1",
+    "U1"
+  ],
+  "net_names": [
+    "BUS_D0",
+    "BUS_D1",
+    "BUS_D2",
+    "GND",
+    "VCC_3V3",
+    "CLK"
+  ],
+  "via_count": 3,
+  "layers": 2,
+  "source": "fixture-companion"
+}

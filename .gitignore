@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+*.egg
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# MigraEDA runtime
+.migraeda/
+*.log
+/tmp/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Secrets — never commit tokens
+*TOKEN*
+*token*.txt
+credentials*

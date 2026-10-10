@@ -2,73 +2,89 @@
 
 > KiCad 能打开你的嘉立创工程；我们告诉你哪里其实已经坏了，并能回滚。
 
-**可验证迁移**：嘉立创 / EasyEDA 专业版 → KiCad（后续探索 Altium）  
-不是「尽力转换」，而是 **规范化 → 转换 → 差异报告 → 审计 / 回滚**。
+**可验证迁移**（嘉立创 / EasyEDA 专业版 `.epro` → KiCad）：normalize → migrate → **diff** → report → audit / rollback。  
+不是又一个库转换器。
+
+| 别人做 | MigraEDA 做 |
+|--------|-------------|
+| 库转换（easyeda2kicad.py / EasyKiConverter / JLC2KiCad_lib） | **不做**库转换 |
+| KiCad 原生 Import + 肉眼检查 | **差异报告**（元件 / 网络 / 过孔） |
+| 官方 AD 导出免责 | 审计 + **可回滚** |
 
 ---
 
-## 现状（为什么做）
+## 快速开始
 
-| 路径 | 能力 | 缺口 |
-|------|------|------|
-| 库转换开源（easyeda2kicad.py / EasyKiConverter / JLC2KiCad_lib） | 符号 / 封装 / 3D | **不做整项目** |
-| KiCad 原生 Import EasyEDA Pro | 原理图 + PCB 只读导入 | **无差异报告、无回滚** |
-| 官方格式转换助手 | 迁**入**嘉立创强；导出到 KiCad **不支持** | 迁出免责、勿反复转 |
-| epro2kicad（MIT） | `.epro` 修复 + 无头 PCB 导入 | 原理图仍需 GUI；无产品化差异层 |
+```bash
+git clone https://gitee.com/luowenxing/MigraEDA.git
+cd MigraEDA
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
 
-空白：**工程级、可验证、可审计的无损迁出**。
+# 无 KiCad 也可跑通
+migraeda migrate fixtures/golden/simple.epro -o /tmp/migraeda-out --dry-run
+cat /tmp/migraeda-out/report.md
 
----
-
-## 产品范围（MVP）
-
-### In scope（第一版）
-
-- 来源：嘉立创 / EasyEDA **专业版** `.epro`
-- 目标：KiCad 8/9/10 工程包（单向）
-- 板型：以 **2 层**为主；≤200 元件；单 sheet 或浅层级
-- 输出：转换结果 + **差异报告**（摘要免费 / 完整付费）+ 审计日志 + 可回滚快照
-
-### Out of scope（0–6 月不做）
-
-- Altium GA、双向同步、标准版完整 SLA
-- ≥6 层 / HDI / 刚挠、「DRC 像素级保证」
-- 爬取用户嘉立创账号、重写 KiCad 导入器
-
----
-
-## 架构（草案）
-
-```
-.epro (ZIP / JSONL)
-    → normalize/   # 换行、RULE、NET、版本指纹
-    → engine/      # KiCad pcbnew（+ 原理图 GUI/IPC）
-    → diff/        # 源统计 vs KiCad → diff.json
-    → report/      # 摘要(Free) / 完整(Paid)
-    → audit/       # migration_id、hash、回滚
+pytest -q
 ```
 
-自研重点在 **差异与审计**；转换引擎站在 KiCad 原生导入 + epro2kicad 式预处理上。
+### CLI
+
+```bash
+migraeda migrate <input.epro> -o <outdir> [--dry-run]
+migraeda diff <source.epro> <kicad_or_stats.json> -o report.md
+migraeda report <diff.json> -o report.md|--html
+migraeda rollback <migration_id>
+```
+
+`migrate --dry-run`（默认在无 KiCad 时等价启用）会写出：
+
+- `source_stats.json` / `kicad_stats.json`
+- `diff.json` + `report.md` / `report.html`
+- 占位 `.kicad_pro` / `.kicad_pcb` / `.kicad_sch`
+- 审计记录（`MIGRAEDA_AUDIT_DIR` 或 `~/.migraeda/audit/<migration_id>/`）
+
+### diff_v0 分级
+
+| 等级 | 条件（摘要） |
+|------|----------------|
+| **PASS** | 元件数、网络名集合、过孔数均一致 |
+| **WARN** | 网络对称差 ≤2，或过孔差 1（元件数须一致） |
+| **FAIL** | 元件数不等，或网络对称差 >2，或过孔差 >1 |
 
 ---
 
-## 仓库状态
+## MVP 范围
 
-私有仓库，早期脚手架。近期计划：
+**In scope（第一版）**
 
-1. 金标 `.epro` 样例（不含用户私密工程）
-2. CLI：`migrate input.epro -o out/`
-3. `diff_v0`：元件数 / 网络名集合 / 过孔数
-4. 支持矩阵与已知限制文档
+- 源：嘉立创 / EasyEDA **专业版** `.epro`（合成 fixture + 可扩展解析）
+- 目标：KiCad 8/9/10 管道（无 KiCad 时 dry-run）
+- 仅 **2 层**、≤200 元件；单 sheet 假设
+- 输出：差异报告 + 审计 + 可回滚
+
+**Out of scope（0–6 月不做）**
+
+- Altium GA、多层/HDI、盲埋孔、完整 DRC 像级保证
+- 账号、付费墙、重写 KiCad 导入引擎
+
+架构细节与里程碑见 [`docs/PLAN.md`](docs/PLAN.md)。
+
+---
+
+## Fixtures
+
+`fixtures/golden/*.epro` 是 **合成 ZIP + JSON**，字段名贴近公开资料，**不是**官方完整 schema。  
+重建：`python scripts/build_fixtures.py`。
 
 ---
 
 ## 许可
 
-待定（核心倾向 MIT / Apache-2.0；避免把 GPL 库转换器静态链进闭源发行版）。
+核心 **MIT**。不要静态链接 GPL EasyKiConverter。
 
 ---
 
 ## 联系
 
-内部产品名：**MigraEDA**。对外叙事以 README 顶部一句话为准。
+仓库与产品名：**MigraEDA**。问题请开 Issue 或改本 README。

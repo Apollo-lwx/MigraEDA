@@ -1,0 +1,14 @@
+{
+  "name": "bus_mismatch",
+  "component_count": 2,
+  "component_refs": [
+    "R1",
+    "C1"
+  ],
+  "net_names": [
+    "GND"
+  ],
+  "via_count": 0,
+  "layers": 2,
+  "source": "fixture-companion-fail"
+}
