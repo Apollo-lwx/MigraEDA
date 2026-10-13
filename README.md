@@ -1,15 +1,27 @@
 # MigraEDA
 
-> KiCad 能打开你的嘉立创工程；我们告诉你哪里其实已经坏了，并能回滚。
+> 嘉立创 ↔ Altium 双向转换，每一步转换都有独立验证兜底。
 
-**可验证迁移**（嘉立创 / EasyEDA 专业版 `.epro` → KiCad）：normalize → migrate → **diff** → report → audit / rollback。  
-不是又一个库转换器。
+**转换 + 验证闭环**：原理图 / PCB / 库三条链路，**不写一行"请相信转换器"的代码**——
+每次转换自动重解析产物并做引脚级 LVS 比对，不一致即返回非零退出码。
 
 | 别人做 | MigraEDA 做 |
 |--------|-------------|
-| 库转换（easyeda2kicad.py / EasyKiConverter / JLC2KiCad_lib） | **不做**库转换 |
-| KiCad 原生 Import + 肉眼检查 | **差异报告**（元件 / 网络 / 过孔） |
-| 官方 AD 导出免责 | 审计 + **可回滚** |
+| 静默转换（嘉立创官方导入导出，丢了不告诉你） | 转换 + **引脚级闭环验证**，错位精确到 `位号.引脚` |
+| 肉眼开两个 EDA 比图 | 自动 LVS 报告（PASS / WARN / FAIL + 标准 Markdown 报告） |
+| 只转原理图 | 原理图 + **PCB（走线/过孔/铜皮）** + **库（符号/封装）** |
+
+---
+
+## 支持的格式
+
+| 格式 | 读 | 写 | 说明 |
+|------|----|----|------|
+| 嘉立创 `.eprj` | ✅ 原理图 + **PCB**（docType=3）+ 内嵌库 | ✅ 原理图 + **PCB** + 库包 | SQLite 工程，零依赖解析 |
+| AD `.SchDoc` | ✅ 二进制 + ASCII | ✅ ASCII | 多部件/多显示模式语义完整实现 |
+| AD `.PcbDoc` | ✅ 二进制 + ASCII | ✅ ASCII | 焊盘/过孔/走线/圆弧/铺铜/板框 |
+| AD `.SchLib` / `.PcbLib` | ✅ | 待样本验证后开放 | 可用 `libinspect` 结构自检 |
+| 嘉立创专业版 `.epro` | ✅（早期 MVP 管道） | — | 见下文「.epro → KiCad 管道」 |
 
 ---
 
@@ -18,54 +30,85 @@
 ```bash
 git clone https://gitee.com/luowenxing/MigraEDA.git
 cd MigraEDA
-python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-
-# 无 KiCad 也可跑通
-migraeda migrate fixtures/golden/simple.epro -o /tmp/migraeda-out --dry-run
-cat /tmp/migraeda-out/report.md
-
-pytest -q
+pytest -q        # 40 项测试全绿即可
 ```
 
-### CLI
+设计文件按 [`samples/README.md`](samples/README.md) 投到 `samples/<项目名>/`（按扩展名自动归类，**内容不入库**）：
+
+```bash
+migraeda samples                                        # 查看识别到的样本
+migraeda roundtrip samples/XXX/板子.eprj                 # 一键：转换+往返+自比对
+```
+
+---
+
+## 命令一览
+
+### 转换（全部自动闭环验证）
+
+```bash
+migraeda convert 板子.eprj   --to ad     # 嘉立创 → AD ASCII 原理图
+migraeda convert 板子.SchDoc --to eprj   # AD 原理图 → 嘉立创工程
+migraeda convert 板子.eprj   --to adpcb  # 嘉立创 PCB → AD ASCII PcbDoc
+migraeda libconvert 库.PcbLib -o out     # 库 → 嘉立创库包
+```
+
+### 验证
+
+```bash
+migraeda verify a.eprj b.SchDoc [--report out.md]   # 引脚级 LVS（网表等价性）
+migraeda pcbdiff a.PcbDoc b.PcbDoc [--report out.md] # PCB 级 diff（板框/元件/焊盘/过孔/铜皮）
+migraeda libdiff a b [--report out.md]               # 库级 diff（符号引脚/封装焊盘）
+```
+
+`verify` / `pcbdiff` / `libdiff` 均支持 `.eprj` / `.SchDoc` / `.PcbDoc`（二进制或 ASCII）混比，
+坐标系/拼板差异自动做刚体对齐后再比位置。
+
+### 往返自比对
+
+```bash
+migraeda roundtrip 板子.eprj    # 原理图+PCB 双程：转出→转回→与原文件逐点比
+migraeda roundtrip 板子.SchDoc
+```
+
+中间产物全部留档（`out/roundtrip/`），结论只有两种：`IDENTICAL ✅` / `DIFFERS ❌`。
+
+### 辅助
+
+```bash
+migraeda samples                  # 列出 samples/ 下的设计样本
+migraeda libinspect 文件          # 结构自检（仅元数据，可安全外发求助）
+```
+
+---
+
+## 为什么可信：验证方法论
+
+本工具的核心不是"能转"，而是"**转完可证**"：
+
+1. **loop-verify（内环）**：转换产物立即重新解析，与源文件做引脚级 LVS——0 不匹配才放行。
+2. **全管线比对（外环）**：产物与"原厂另一份文件"比对，差异必须等于两版设计的已知差异，
+   多一处都是转换器 bug（旋转手性 bug 就是这样被抓到归零的）。
+3. **往返自比对（闭环）**：`A → B → A`，终件与原文件必须逐点一致。
+
+几何连通重建规则（与 KiCad 导入器语义对齐）：导线端点/T 型相接、**零长度网络点**、
+引脚直接对碰、**多部件元件只激活 `OWNERPARTID==CURRENTPARTID` 的引脚**、
+多显示模式取当前模式、Altium 网络名大小写不敏感、拼板实例归并。
+
+---
+
+## .epro → KiCad 管道（早期 MVP）
+
+原始能力保留：`migrate` / `diff` / `report` / `rollback`，面向嘉立创专业版 `.epro` 的
+可验证 KiCad 迁移（无 KiCad 时 dry-run 全通）：
 
 ```bash
 migraeda migrate <input.epro> -o <outdir> [--dry-run]
 migraeda diff <source.epro> <kicad_or_stats.json> -o report.md
 migraeda report <diff.json> -o report.md|--html
 migraeda rollback <migration_id>
-
-# 三格式原理图转换（闭环自验证）与 LVS 比对
-migraeda convert <input.eprj|input.SchDoc> --to ad|eprj [-o outdir] [--no-verify]
-migraeda verify <a.eprj|a.SchDoc|a.PcbDoc> <b...> [--limit N]
 ```
-
-**convert**：嘉立创 `.eprj` ↔ AD `.SchDoc` 原理图级转换（元件/引脚/导线/网络标签/电源符号，
-符号为按引脚位置合成的方框；每次转换自动重解析输出并做引脚级 LVS 闭环验证，不一致退出码非零）。
-
-**verify**：任意两份设计文件（嘉立创 `.eprj` / AD `.SchDoc` / AD `.PcbDoc`）的引脚级网表比对，
-输出公共引脚、逐引脚差异、网络对应关系（先按名称匹配，再按引脚成员结构匹配）。
-
-```bash
-migraeda verify <a> <b> [--report out.md]   # + 标准验证报告
-migraeda pcbdiff <a.PcbDoc> <b.PcbDoc>      # PCB 级 diff（板框/焊盘/过孔/铜皮）
-migraeda libdiff <a> <b>                    # 库级 diff（符号引脚/封装焊盘）
-migraeda libconvert <a> -o out              # 库 → eprj 库包（闭环验证）
-migraeda samples                            # 列出 samples/ 下已识别的设计样本
-```
-
-### 样本目录约定
-
-需要验证/转换的真实设计文件，按 [`samples/README.md`](samples/README.md) 的规范投到
-`samples/<项目名>/`（按扩展名自动归类，目录内容不入库），`migraeda samples` 随时查看识别结果。
-
-`migrate --dry-run`（默认在无 KiCad 时等价启用）会写出：
-
-- `source_stats.json` / `kicad_stats.json`
-- `diff.json` + `report.md` / `report.html`
-- 占位 `.kicad_pro` / `.kicad_pcb` / `.kicad_sch`
-- 审计记录（`MIGRAEDA_AUDIT_DIR` 或 `~/.migraeda/audit/<migration_id>/`）
 
 ### diff_v0 分级
 
@@ -77,36 +120,24 @@ migraeda samples                            # 列出 samples/ 下已识别的设
 
 ---
 
-## MVP 范围
+## 限制与边界（诚实版）
 
-**In scope（第一版）**
-
-- 源：嘉立创 / EasyEDA **专业版** `.epro`（合成 fixture + 可扩展解析）
-- 目标：KiCad 8/9/10 管道（无 KiCad 时 dry-run）
-- 仅 **2 层**、≤200 元件；单 sheet 假设
-- 输出：差异报告 + 审计 + 可回滚
-
-**Out of scope（0–6 月不做）**
-
-- Altium GA、多层/HDI、盲埋孔、完整 DRC 像级保证
-- 账号、付费墙、重写 KiCad 导入引擎
-
-架构细节与里程碑见 [`docs/PLAN.md`](docs/PLAN.md)。
+- **符号/封装图形不转**：转换后的符号是按引脚位置合成的方框（引脚编号/位置/连通精确），
+  库图形不在范围；封装保留名称引用与焊盘几何。
+- **PCB 写出为 ASCII .PcbDoc**：AD 可直接打开；二进制 PcbDoc 只读。
+- **库写出目前仅嘉立创侧**：AD 库（SchLib/PcbLib）写出待真实样本校准。
+- 生成的 `.eprj` 已按真实 schema 复刻并通过自家解析器回读验证，客户端打开情况以实测为准。
 
 ---
 
 ## Fixtures
 
-`fixtures/golden/*.epro` 是 **合成 ZIP + JSON**，字段名贴近公开资料，**不是**官方完整 schema。  
+`fixtures/golden/*.epro` 是 **合成 ZIP + JSON**，字段名贴近公开资料，**不是**官方完整 schema。
 重建：`python scripts/build_fixtures.py`。
-
----
 
 ## 许可
 
 核心 **MIT**。不要静态链接 GPL EasyKiConverter。
-
----
 
 ## 联系
 
