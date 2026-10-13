@@ -31,14 +31,68 @@
 git clone https://gitee.com/luowenxing/MigraEDA.git
 cd MigraEDA
 pip install -e ".[dev]"
-pytest -q        # 40 项测试全绿即可
+pytest -q        # 40 项测试全绿即可开始使用
 ```
 
-设计文件按 [`samples/README.md`](samples/README.md) 投到 `samples/<项目名>/`（按扩展名自动归类，**内容不入库**）：
+**放文件**：把你的设计文件丢到 `samples/<项目名>/`（按扩展名自动识别，**内容不会入库**，
+详见 [`samples/README.md`](samples/README.md)）。然后 `migraeda samples` 确认识别结果：
+
+```
+G318: AD PCB, AD原理图, 嘉立创工程
+SME-IOT-1: AD PCB, AD原理图, 嘉立创工程
+```
+
+> 文件也可以不放 samples/ —— 所有命令都接受任意路径，samples/ 只是便利约定。
+
+### 场景 1：我有嘉立创工程，想转成 AD
 
 ```bash
-migraeda samples                                        # 查看识别到的样本
-migraeda roundtrip samples/XXX/板子.eprj                 # 一键：转换+往返+自比对
+migraeda convert samples/G318/板子.eprj --to ad -o samples/G318/out
+```
+
+输出 `板子.SchDoc`（ASCII，AD 直接打开），并**自动做闭环验证**：
+
+```
+direction: eprj -> ad-ascii-schdoc
+written: samples\G318\out\板子.SchDoc
+loop-verify: common_pins=367 mismatched=0 nets_matched=115
+```
+
+`mismatched=0` 表示转换零误差；非零则逐条列出错位引脚，退出码 = 2（可进 CI）。
+同理转 PCB：`--to adpcb`；AD 转回嘉立创：`--to eprj`。
+
+### 场景 2：我有两份文件，想知道是不是同一个设计
+
+```bash
+migraeda verify samples/G318/嘉立创.eprj samples/G318/AD.SchDoc --report samples/G318/out/verify.md
+```
+
+```
+common pins: 351, mismatched: 34, nets matched: 110
+```
+
+34 处差异逐条列出（位号.引脚 + 两边网络名），完整报告在 `verify.md`。
+PCB 对 PCB 用 `migraeda pcbdiff a.PcbDoc b.PcbDoc`（板框/元件/焊盘/过孔/铜皮全维度）。
+
+### 场景 3：用嘉立创官方导入后，想验证有没有丢东西
+
+```bash
+# 嘉立创客户端导入 AD 文件并另存为 .eprj 后：
+migraeda verify 原始.SchDoc 导入后.eprj --report out/check.md
+```
+
+**一键全验证**（转换 + 往返 + 自比对，最省事的用法）：
+
+```bash
+migraeda roundtrip samples/G318/板子.eprj
+```
+
+自动跑：eprj→AD→eprj 原理图往返 + eprj→PcbDoc→eprj PCB 往返，
+中间产物留在 `out/roundtrip/`，最后只给两种结论：
+
+```
+roundtrip: IDENTICAL ✅
+pcb roundtrip: PASS ✅
 ```
 
 ---
@@ -48,37 +102,44 @@ migraeda roundtrip samples/XXX/板子.eprj                 # 一键：转换+往
 ### 转换（全部自动闭环验证）
 
 ```bash
-migraeda convert 板子.eprj   --to ad     # 嘉立创 → AD ASCII 原理图
-migraeda convert 板子.SchDoc --to eprj   # AD 原理图 → 嘉立创工程
-migraeda convert 板子.eprj   --to adpcb  # 嘉立创 PCB → AD ASCII PcbDoc
-migraeda libconvert 库.PcbLib -o out     # 库 → 嘉立创库包
+migraeda convert <输入> --to <目标> [-o 输出目录] [--no-verify]
+```
+
+| 目标 | 输入 | 产物 |
+|------|------|------|
+| `ad` | `.eprj` | ASCII `.SchDoc`（AD 可打开） |
+| `eprj` | `.SchDoc`（二进制/ASCII） | 嘉立创 `.eprj` 工程 |
+| `adpcb` | `.eprj`（含 PCB 页） | ASCII `.PcbDoc`（AD 可打开） |
+
+```bash
+migraeda libconvert <库源> -o out   # .eprj/.SchLib/.PcbLib/.PcbDoc → 嘉立创库包(.eprj)
 ```
 
 ### 验证
 
 ```bash
-migraeda verify a.eprj b.SchDoc [--report out.md]   # 引脚级 LVS（网表等价性）
-migraeda pcbdiff a.PcbDoc b.PcbDoc [--report out.md] # PCB 级 diff（板框/元件/焊盘/过孔/铜皮）
-migraeda libdiff a b [--report out.md]               # 库级 diff（符号引脚/封装焊盘）
+migraeda verify <a> <b> [--report out.md] [--limit 30]
+migraeda pcbdiff <a> <b> [--tol 2.0] [--report out.md]
+migraeda libdiff <a> <b> [--tol 1.0] [--report out.md]
 ```
 
-`verify` / `pcbdiff` / `libdiff` 均支持 `.eprj` / `.SchDoc` / `.PcbDoc`（二进制或 ASCII）混比，
-坐标系/拼板差异自动做刚体对齐后再比位置。
+- `<a>`/`<b>` 可为 `.eprj` / `.SchDoc` / `.PcbDoc`（二进制或 ASCII）任意组合
+- 坐标系/拼板差异自动刚体对齐后再比位置；退出码：PASS=0 / WARN=1 / FAIL=2
 
 ### 往返自比对
 
 ```bash
-migraeda roundtrip 板子.eprj    # 原理图+PCB 双程：转出→转回→与原文件逐点比
-migraeda roundtrip 板子.SchDoc
+migraeda roundtrip <输入.eprj|.SchDoc> [-o 输出目录]
 ```
 
-中间产物全部留档（`out/roundtrip/`），结论只有两种：`IDENTICAL ✅` / `DIFFERS ❌`。
+转出→转回→与原文件逐引脚比对；原理图必跑，检测到 PCB 数据时 PCB 一并跑；
+中间产物全部留档（`out/roundtrip/`）。
 
 ### 辅助
 
 ```bash
-migraeda samples                  # 列出 samples/ 下的设计样本
-migraeda libinspect 文件          # 结构自检（仅元数据，可安全外发求助）
+migraeda samples [--root samples]   # 列出已识别的设计样本
+migraeda libinspect <文件>          # 结构自检（仅元数据，可安全外发求助）
 ```
 
 ---
