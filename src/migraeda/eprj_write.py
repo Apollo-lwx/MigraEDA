@@ -552,6 +552,11 @@ def write_eprj(ir: SchematicIR, path: str | Path, project_name: str | None = Non
             wid = ids.next()
             segs = [[_n(a[0]), _n(a[1]), _n(b[0]), _n(b[1])]
                     for a, b in zip(w.points, w.points[1:]) if a != b]
+            if not segs and len(w.points) >= 2:
+                # all-degenerate wire = LCEDA "net point": preserve it,
+                # it is how the source carries named nets at single points
+                x, y = w.points[0]
+                segs = [[_n(x), _n(y), _n(x), _n(y)]]
             if not segs:
                 continue
             lines.append(json.dumps(["WIRE", wid, segs, "st9", 0]))

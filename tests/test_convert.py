@@ -86,6 +86,21 @@ def test_roundtrip_eprj(tmp_path: Path) -> None:
     assert back.components["C1"].footprint == "0805C"
 
 
+def test_degenerate_netpoint_preserved(tmp_path: Path) -> None:
+    """LCEDA-style zero-length named wires (net points) must survive eprj write."""
+    from migraeda.ir import IRWire
+
+    ir = _demo_ir()
+    # degenerate named wire exactly on R1 pin 1 hotspot (90,100)
+    ir.wires.append(IRWire(points=[(90.0, 100.0), (90.0, 100.0)], net="NETPOINT"))
+    src = netlist_from_ir(ir)
+    assert src.pin_nets[("R1", "1")] == "NETPOINT"
+
+    out = write_eprj(ir, tmp_path / "dp.eprj")
+    back = parse_eprj(out)
+    assert back.pin_nets[("R1", "1")] == "NETPOINT"
+
+
 def test_eprj_is_sqlite(tmp_path: Path) -> None:
     import sqlite3
 

@@ -235,7 +235,40 @@ def build_parser() -> argparse.ArgumentParser:
     )
     li.add_argument("input", help="File to inspect (.SchLib/.PcbLib/.PcbDoc/.SchDoc/...)")
     li.set_defaults(func=_cmd_libinspect)
+
+    fz = sub.add_parser(
+        "fuzz",
+        help="Fuzz the conversion chain with mutated inputs (finds hidden bugs)",
+    )
+    fz.add_argument("input", help="Source file (.eprj/.SchDoc)")
+    fz.add_argument("-n", "--iterations", type=int, default=50, help="Iterations")
+    fz.add_argument("--seed", type=int, default=42, help="Base random seed")
+    fz.add_argument("--keep", default=None, help="Dir to keep crashing artifacts")
+    fz.set_defaults(func=_cmd_fuzz)
+
+    sc = sub.add_parser(
+        "selfcheck",
+        help="Invariant battery on one file (suspicious signals for parser/file issues)",
+    )
+    sc.add_argument("input", help="File to check (.eprj/.SchDoc/.PcbDoc)")
+    sc.set_defaults(func=_cmd_selfcheck)
     return p
+
+
+def _cmd_fuzz(args: argparse.Namespace) -> int:
+    from migraeda.fuzz import fuzz_file, render_fuzz_report
+
+    report = fuzz_file(args.input, iterations=args.iterations,
+                       seed=args.seed, keep_dir=args.keep)
+    print(render_fuzz_report(args.input, report))
+    return 0 if report.ok else 2
+
+
+def _cmd_selfcheck(args: argparse.Namespace) -> int:
+    from migraeda.selfcheck import selfcheck
+
+    print(selfcheck(args.input))
+    return 0
 
 
 def _cmd_libinspect(args: argparse.Namespace) -> int:
