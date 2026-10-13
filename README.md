@@ -35,7 +35,30 @@ migraeda migrate <input.epro> -o <outdir> [--dry-run]
 migraeda diff <source.epro> <kicad_or_stats.json> -o report.md
 migraeda report <diff.json> -o report.md|--html
 migraeda rollback <migration_id>
+
+# 三格式原理图转换（闭环自验证）与 LVS 比对
+migraeda convert <input.eprj|input.SchDoc> --to ad|eprj [-o outdir] [--no-verify]
+migraeda verify <a.eprj|a.SchDoc|a.PcbDoc> <b...> [--limit N]
 ```
+
+**convert**：嘉立创 `.eprj` ↔ AD `.SchDoc` 原理图级转换（元件/引脚/导线/网络标签/电源符号，
+符号为按引脚位置合成的方框；每次转换自动重解析输出并做引脚级 LVS 闭环验证，不一致退出码非零）。
+
+**verify**：任意两份设计文件（嘉立创 `.eprj` / AD `.SchDoc` / AD `.PcbDoc`）的引脚级网表比对，
+输出公共引脚、逐引脚差异、网络对应关系（先按名称匹配，再按引脚成员结构匹配）。
+
+```bash
+migraeda verify <a> <b> [--report out.md]   # + 标准验证报告
+migraeda pcbdiff <a.PcbDoc> <b.PcbDoc>      # PCB 级 diff（板框/焊盘/过孔/铜皮）
+migraeda libdiff <a> <b>                    # 库级 diff（符号引脚/封装焊盘）
+migraeda libconvert <a> -o out              # 库 → eprj 库包（闭环验证）
+migraeda samples                            # 列出 samples/ 下已识别的设计样本
+```
+
+### 样本目录约定
+
+需要验证/转换的真实设计文件，按 [`samples/README.md`](samples/README.md) 的规范投到
+`samples/<项目名>/`（按扩展名自动归类，目录内容不入库），`migraeda samples` 随时查看识别结果。
 
 `migrate --dry-run`（默认在无 KiCad 时等价启用）会写出：
 
