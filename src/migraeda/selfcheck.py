@@ -26,6 +26,20 @@ def selfcheck(path: str | Path) -> str:
     w(f"selfcheck: {path.name}")
     w(f"  parsed: {len(model.components)} comps, {len(model.pin_nets)} pins, "
       f"{len(model.net_members())} nets")
+
+    # schematic-less project (PCB-only): fall back to the PCB view
+    if not model.components and path.suffix.lower() == ".eprj":
+        try:
+            from migraeda.convert import eprj_has_pcb
+            from migraeda.epcb import parse_epcb
+
+            if eprj_has_pcb(path):
+                nl = parse_epcb(path)
+                w(f"  [PCB-only project] pcb: {len(nl.components)} comps, "
+                  f"{len(nl.pads)} pads, {len(nl.tracks)} tracks, "
+                  f"{len(nl.vias)} vias, {len(nl.nets) - 1} nets")
+        except Exception as exc:  # noqa: BLE001
+            w(f"  ✗ pcb fallback failed: {exc}")
     issues = 0
 
     # duplicate designators

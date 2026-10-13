@@ -43,9 +43,12 @@ class EpcbComponent:
 
 
 def _iter_pcb_records(con: sqlite3.Connection):
+    from migraeda.eprj_sqlite import _maybe_decompress
+
     for (data,) in con.execute(
         "SELECT dataStr FROM documents WHERE docType=3 AND LENGTH(dataStr) > 1000"
     ):
+        data = _maybe_decompress(data)
         for line in data.splitlines():
             line = line.strip()
             if not line.startswith("["):

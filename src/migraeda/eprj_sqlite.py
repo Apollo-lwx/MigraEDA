@@ -53,6 +53,7 @@ def _load_symbols(con: sqlite3.Connection) -> dict[str, SymbolDef]:
         "SELECT uuid, title, display_title, dataStr FROM components WHERE docType=2"
     ).fetchall()
     for uuid, title, display_title, data in rows:
+        data = _maybe_decompress(data)
         sym = SymbolDef(uuid=uuid, title=display_title or title)
         pins: dict[str, SymbolPin] = {}
         pin_attrs: dict[str, dict[str, str]] = {}
@@ -93,11 +94,27 @@ def _load_symbols(con: sqlite3.Connection) -> dict[str, SymbolDef]:
     return out
 
 
+def _maybe_decompress(data: str) -> str:
+    """Newer editor versions store documents as base64(gzip(dataStr))."""
+    if data.startswith("base64"):
+        import base64
+        import zlib
+
+        try:
+            return zlib.decompress(
+                base64.b64decode(data[6:]), 16 + zlib.MAX_WBITS
+            ).decode("utf-8", errors="replace")
+        except Exception:
+            return data
+    return data
+
+
 def _sheet_records(con: sqlite3.Connection) -> list[list]:
     sheets: list[list] = []
     for (data,) in con.execute(
         "SELECT dataStr FROM documents WHERE docType=1 ORDER BY sort_ticket, sheet_id"
     ):
+        data = _maybe_decompress(data)
         recs = []
         for line in data.splitlines():
             line = line.strip()

@@ -30,6 +30,9 @@ def _nums(spec, limit: int = 3) -> list[float]:
 
 
 def _parse_footprint(data: str, name: str) -> LibFootprint:
+    from migraeda.eprj_sqlite import _maybe_decompress
+
+    data = _maybe_decompress(data)
     fp = LibFootprint(name=name)
     xs: list[float] = []
     ys: list[float] = []

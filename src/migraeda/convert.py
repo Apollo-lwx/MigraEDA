@@ -88,7 +88,14 @@ def load_netlist(path: str | Path) -> NetlistModel:
     if suf == ".pcbdoc":
         from migraeda.pcbdoc import parse_pcbdoc
 
-        nl = parse_pcbdoc(path)
+        with open(path, "rb") as fh:
+            head = fh.read(16)
+        if head.startswith(b"|RECORD"):
+            from migraeda.pcbascii import parse_pcb_ascii
+
+            nl = parse_pcb_ascii(path)
+        else:
+            nl = parse_pcbdoc(path)
         m = NetlistModel(source=f"pcbdoc:{path.name}")
         seen: set[str] = set()
         for c in nl.components:
@@ -131,7 +138,14 @@ def load_library(path: str | Path):
     if suf == ".schlib":
         return parse_schlib(path)
     if suf == ".pcbdoc":
-        nl = parse_pcbdoc(path)
+        with open(path, "rb") as fh:
+            head = fh.read(16)
+        if head.startswith(b"|RECORD"):
+            from migraeda.pcbascii import parse_pcb_ascii
+
+            nl = parse_pcb_ascii(path)
+        else:
+            nl = parse_pcbdoc(path)
         lib = Library(source=f"pcbdoc-embedded:{path.name}")
         for pattern, pads in nl.footprint_map().items():
             lib.footprints[pattern] = LibFootprint(
