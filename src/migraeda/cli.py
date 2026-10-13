@@ -227,6 +227,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("samples", help="List design samples under samples/ (see samples/README.md)")
     s.add_argument("--root", default="samples", help="Samples root directory")
+    s.add_argument("--check", action="store_true",
+                   help="Run the selfcheck battery on every discovered design file")
     s.set_defaults(func=_cmd_samples)
 
     li = sub.add_parser(
@@ -279,9 +281,24 @@ def _cmd_libinspect(args: argparse.Namespace) -> int:
 
 
 def _cmd_samples(args: argparse.Namespace) -> int:
-    from migraeda.samples import describe
+    from migraeda.samples import describe, scan_samples
 
     print(describe(args.root))
+    if args.check:
+        from migraeda.selfcheck import selfcheck
+
+        sets = scan_samples(args.root)
+        seen: set[str] = set()
+        for ss in sets.values():
+            for files in ss.files.values():
+                for f in files:
+                    if str(f) in seen:
+                        continue
+                    seen.add(str(f))
+                    try:
+                        print("\n" + selfcheck(f))
+                    except Exception as exc:  # noqa: BLE001 - batch must not die on one file
+                        print(f"\nselfcheck: {f.name}\n  ✗ parse failed: {exc}")
     return 0
 
 
