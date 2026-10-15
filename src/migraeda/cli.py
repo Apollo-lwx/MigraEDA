@@ -85,14 +85,33 @@ def _cmd_rollback(args: argparse.Namespace) -> int:
 def _cmd_convert(args: argparse.Namespace) -> int:
     from migraeda.convert import PcbConvertResult
 
-    res = convert(args.input, args.to, out_dir=args.output, verify=not args.no_verify)
+    res = convert(
+        args.input,
+        args.to,
+        out_dir=args.output,
+        verify=not args.no_verify,
+        panel_rows=max(1, int(getattr(args, "panel_rows", 1) or 1)),
+        with_pcb=getattr(args, "with_pcb", None),
+    )
     if isinstance(res, PcbConvertResult):
         print("direction: eprj-pcb -> ad-ascii-pcbdoc")
-        print(f"source: {res.components} components, {res.pads} pads, "
-              f"{res.tracks} tracks, {res.vias} vias")
+        pr = max(1, int(getattr(args, "panel_rows", 1) or 1))
+        if pr > 1:
+            print(f"panel: {pr} rows (vertical step-and-repeat)")
+        print(
+            f"source: {res.components} components, {res.pads} pads, "
+            f"{res.tracks} tracks, {res.vias} vias, {res.polygons} pour polygons"
+        )
         print(f"written: {res.out_path}")
         if res.verify_grade:
-            print(f"loop-verify: {res.verify_grade} ({res.verify_details})")
+            print(f"fidelity-verify: {res.verify_grade} ({res.verify_details})")
+        if getattr(args, "report", None):
+            from migraeda.selfcheck_pcb import write_selfcheck_pcb_report
+
+            eprj = Path(args.input)
+            rpt = write_selfcheck_pcb_report(eprj, args.report, converted_pcbdoc=res.out_path)
+            print(f"report: {rpt}")
+        if res.verify_grade:
             return {"PASS": 0, "WARN": 1, "FAIL": 2}[res.verify_grade]
         return 0
     print(f"direction: {res.direction}")
@@ -115,8 +134,13 @@ def _cmd_convert(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    a = load_netlist(args.file_a)
-    b = load_netlist(args.file_b)
+    pa = Path(args.file_a)
+    pb = Path(args.file_b)
+    # .eprj vs .PcbDoc: compare PCB pad nets, not schematic (names differ by design).
+    a_pcb = pa.suffix.lower() == ".eprj" and pb.suffix.lower() == ".pcbdoc"
+    b_pcb = pb.suffix.lower() == ".eprj" and pa.suffix.lower() == ".pcbdoc"
+    a = load_netlist(args.file_a, pcb=a_pcb)
+    b = load_netlist(args.file_b, pcb=b_pcb)
     res = compare_netlists(a, b)
     print(f"A: {res.a_name}")
     print(f"B: {res.b_name}")
@@ -186,6 +210,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Output directory (default: <input_dir>/out)")
     c.add_argument("--no-verify", action="store_true",
                    help="Skip closed-loop verification of the converted file")
+    c.add_argument("--panel-rows", type=int, default=1, metavar="N",
+                   help="Repeat the board N times vertically (panelization, adpcb only)")
+    c.add_argument(
+        "--with-pcb",
+        default=None,
+        metavar="PCBDOC",
+        help="When --to eprj: embed layout from this .PcbDoc (required for non-blank PCB page)",
+    )
+    c.add_argument(
+        "--report",
+        default=None,
+        help="Write Markdown report (adpcb: fidelity_pcb; eprj/verify: see verify --report)",
+    )
     c.set_defaults(func=_cmd_convert)
 
     v = sub.add_parser("verify", help="LVS-compare two design files (eprj/SchDoc/PcbDoc)")
@@ -253,6 +290,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Invariant battery on one file (suspicious signals for parser/file issues)",
     )
     sc.add_argument("input", help="File to check (.eprj/.SchDoc/.PcbDoc)")
+    sc.add_argument(
+        "--pcb",
+        action="store_true",
+        help="PCB fidelity checklist (requires .eprj with embedded PCB)",
+    )
+    sc.add_argument(
+        "--converted",
+        default=None,
+        metavar="PCBDOC",
+        help="Converted ASCII .PcbDoc to compare (with --pcb)",
+    )
+    sc.add_argument(
+        "--report",
+        default=None,
+        help="Write Markdown report to this path (with --pcb)",
+    )
     sc.set_defaults(func=_cmd_selfcheck)
     return p
 
@@ -267,6 +320,22 @@ def _cmd_fuzz(args: argparse.Namespace) -> int:
 
 
 def _cmd_selfcheck(args: argparse.Namespace) -> int:
+    if getattr(args, "pcb", False):
+        from migraeda.selfcheck_pcb import selfcheck_pcb, write_selfcheck_pcb_report
+
+        if getattr(args, "report", None):
+            out = write_selfcheck_pcb_report(
+                args.input, args.report, converted_pcbdoc=args.converted
+            )
+            text = out.read_text(encoding="utf-8")
+            print(f"report: {out}")
+        else:
+            text = selfcheck_pcb(args.input, converted_pcbdoc=args.converted)
+        print(text)
+        ok = "保真通过" in text and "❌" not in text.split("## 3. 总体结论")[-1][:80]
+        if args.converted is None:
+            return 0
+        return 0 if ok else 2
     from migraeda.selfcheck import selfcheck
 
     print(selfcheck(args.input))

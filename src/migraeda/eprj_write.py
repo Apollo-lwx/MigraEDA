@@ -355,7 +355,12 @@ def write_library_eprj(lib, path: str | Path, project_name: str | None = None) -
     return path
 
 
-def write_eprj(ir: SchematicIR, path: str | Path, project_name: str | None = None) -> Path:
+def write_eprj(
+    ir: SchematicIR,
+    path: str | Path,
+    project_name: str | None = None,
+    pcb_nl: "PcbNetlist | None" = None,
+) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -404,6 +409,7 @@ def write_eprj(ir: SchematicIR, path: str | Path, project_name: str | None = Non
         # --- symbols / devices / footprints (dedup by content signature)
         sym_uuid_by_sig: dict[tuple, tuple[str, str]] = {}
         dev_uuid_by_value: dict[str, str] = {}
+        dev_uuid_by_ref: dict[str, str] = {}
         fp_uuid_by_name: dict[str, str] = {}
 
         def ensure_symbol(comp: IRComponent) -> tuple[str, str]:
@@ -471,6 +477,7 @@ def write_eprj(ir: SchematicIR, path: str | Path, project_name: str | None = Non
             cid = ids.next()
             su, stitle = ensure_symbol(comp)
             du = ensure_device(comp)
+            dev_uuid_by_ref[comp.ref] = du
             lines.append(
                 json.dumps(["COMPONENT", cid, f"{stitle}.1", _n(comp.x), _n(comp.y),
                             _n(comp.rotation), 1 if comp.mirror else 0, {}, 0],
@@ -581,12 +588,31 @@ def write_eprj(ir: SchematicIR, path: str | Path, project_name: str | None = Non
             (sheet_uuid, "p1_1", "P1_1", "", 1, sch_data, 1, 1, 0, now, now,
              "", sch_uuid, proj_uuid),
         )
+        pcb_data = '["DOCTYPE","PCB","1.0"]'
+        if pcb_nl is not None:
+            from migraeda.eprj_pcb_write import _pcb_datastr, footprint_library_from_pcb
+
+            pcb_fps, pcb_fp_map = footprint_library_from_pcb(pcb_nl)
+            fp_ids = _IdGen()
+            for fu, fp in pcb_fps.items():
+                cur.execute(
+                    "INSERT INTO components (uuid, title, display_title, description, source,"
+                    " version, created_at, updated_at, ticket, docType, dataStr, createTime,"
+                    " updateTime, modifier_uuid, creator_uuid, owner_uuid, project_uuid,"
+                    " child_tag, parent_tag, custom_tags)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (fu, fp.name.lower(), fp.name, "", "", str(epoch), now, now, 1, 4,
+                     _footprint_datastr(fp, fp_ids), now, now, "", "", "", proj_uuid,
+                     "", "", ""),
+                )
+            pcb_data = _pcb_datastr(pcb_nl, pcb_fp_map, dev_uuid_by_ref)
+
         cur.execute(
             "INSERT INTO documents (uuid, title, display_title, description, docType,"
             " dataStr, sheet_id, ticket, sort_ticket, created_at, updated_at,"
             " creator_uuid, schematic_uuid, project_uuid)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (pcb_uuid, "pcb1", "PCB1", "", 3, '["DOCTYPE","PCB","1.0"]', 1, 1, 0,
+            (pcb_uuid, "pcb1", "PCB1", "", 3, pcb_data, 1, 1, 0,
              now, now, "", "", proj_uuid),
         )
 

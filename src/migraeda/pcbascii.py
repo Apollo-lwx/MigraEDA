@@ -15,8 +15,10 @@ from pathlib import Path
 from migraeda.pcbdoc import (
     PcbArc,
     PcbComponent,
+    PcbFill,
     PcbNetlist,
     PcbPad,
+    PcbPolygon,
     PcbTrack,
     PcbVia,
 )
@@ -145,7 +147,8 @@ def write_pcb_ascii(nl: PcbNetlist, path: str | Path) -> Path:
         add(
             f"RECORD=Polygon|SELECTION=FALSE|LAYER={p.layer or 'BOTTOM'}|LOCKED=FALSE"
             f"|POLYGONOUTLINE=FALSE|USERROUTED=TRUE|PRIMITIVELOCK=TRUE"
-            f"|NET={p.net_index}|POLYGONTYPE=Polygon|POUROVER=TRUE|REMOVEDEAD=FALSE"
+            + (f"|NET={_q(net_of(p.net_index))}" if p.net_index >= 0 else "")
+            + f"|POLYGONTYPE=Polygon|POUROVER=TRUE|REMOVEDEAD=FALSE"
             f"|GRIDSIZE=11.811mil|TRACKWIDTH=11.811mil|HATCHSTYLE=Solid"
             f"|USEOCTAGONS=FALSE|MINPRIMLENGTH=3mil{verts}"
         )
@@ -263,6 +266,29 @@ def parse_pcb_ascii(path: str | Path) -> PcbNetlist:
                     start_angle=_f(rec.get("STARTANGLE", "0")),
                     end_angle=_f(rec.get("ENDANGLE", "0")),
                     width=_f(rec.get("WIDTH", "0")),
+                )
+            )
+        elif rt == "Fill":
+            nl.fills.append(
+                PcbFill(
+                    layer=_NAME_TO_V6.get(rec.get("LAYER", "TOP"), 1),
+                    net_index=net_id(rec["NET"]) if "NET" in rec else -1,
+                    x1=_f(rec.get("X1", "0")), y1=_f(rec.get("Y1", "0")),
+                    x2=_f(rec.get("X2", "0")), y2=_f(rec.get("Y2", "0")),
+                    rotation=_f(rec.get("ROTATION", "0")),
+                )
+            )
+        elif rt == "Polygon":
+            verts: list[tuple[float, float]] = []
+            k = 0
+            while f"VX{k}" in rec and f"VY{k}" in rec:
+                verts.append((_f(rec[f"VX{k}"]), _f(rec[f"VY{k}"])))
+                k += 1
+            nl.polygons.append(
+                PcbPolygon(
+                    net_index=net_id(rec["NET"]) if "NET" in rec else -1,
+                    layer=rec.get("LAYER", "TOP"),
+                    vertices=verts,
                 )
             )
     return nl

@@ -28,18 +28,31 @@ def selfcheck(path: str | Path) -> str:
       f"{len(model.net_members())} nets")
 
     # schematic-less project (PCB-only): fall back to the PCB view
-    if not model.components and path.suffix.lower() == ".eprj":
+    if path.suffix.lower() == ".eprj":
         try:
+            import sqlite3
+
             from migraeda.convert import eprj_has_pcb
             from migraeda.epcb import parse_epcb
-
-            if eprj_has_pcb(path):
+            con = sqlite3.connect(str(path))
+            try:
+                row = con.execute(
+                    "SELECT LENGTH(dataStr) FROM documents WHERE docType=3"
+                    " ORDER BY LENGTH(dataStr) DESC LIMIT 1"
+                ).fetchone()
+                pcb_len = row[0] if row else 0
+            finally:
+                con.close()
+            if pcb_len < 100:
+                w("  ⚠ PCB 页为空占位（仅 DOCTYPE 桩）— 嘉立创打开 PCB 会空白；"
+                  "请用 convert --to eprj --with-pcb <PcbDoc> 重新生成")
+            elif eprj_has_pcb(path):
                 nl = parse_epcb(path)
-                w(f"  [PCB-only project] pcb: {len(nl.components)} comps, "
-                  f"{len(nl.pads)} pads, {len(nl.tracks)} tracks, "
-                  f"{len(nl.vias)} vias, {len(nl.nets) - 1} nets")
+                w(f"  [PCB] {len(nl.components)} comps, {len(nl.pads)} pads, "
+                  f"{len(nl.tracks)} tracks, {len(nl.vias)} vias, "
+                  f"{len(nl.nets) - 1} nets (dataStr ~{pcb_len} bytes)")
         except Exception as exc:  # noqa: BLE001
-            w(f"  ✗ pcb fallback failed: {exc}")
+            w(f"  ✗ pcb check failed: {exc}")
     issues = 0
 
     # duplicate designators

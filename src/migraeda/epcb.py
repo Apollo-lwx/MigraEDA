@@ -22,11 +22,13 @@ from migraeda.pcbdoc import (
     PcbComponent,
     PcbNetlist,
     PcbPad,
+    PcbPolygon,
     PcbTrack,
     PcbVia,
 )
 
 _LAYER_TO_V6 = {1: 1, 2: 32}  # LCEDA TOP/BOTTOM -> v6 top/bottom
+_COPPER_LAYER_IDS = {1, 2}
 
 
 @dataclass
@@ -83,6 +85,11 @@ def parse_epcb(path: str | Path) -> PcbNetlist:
         recs = list(_iter_pcb_records(con))
     finally:
         con.close()
+
+    net_order: list[str] = []
+    for r in recs:
+        if r[0] == "NET" and len(r) >= 2 and r[1]:
+            net_order.append(html.unescape(str(r[1])))
 
     out = PcbNetlist()
     out.nets.append("")  # index 0 = no net, LCEDA indices start at 1 elsewhere
@@ -207,6 +214,71 @@ def parse_epcb(path: str | Path) -> PcbNetlist:
                          width=float(r[9]))
             )
 
+    def _net_from_pour(r: list) -> int:
+        if len(r) > 3 and r[3] is not None and str(r[3]).strip():
+            return net_id(str(r[3]))
+        if len(r) > 7 and isinstance(r[7], int):
+            idx = r[7]
+            if 0 <= idx < len(net_order):
+                return net_id(net_order[idx])
+        return net_id("")
+
+    def _layer_label(layer_id: int) -> str:
+        return "TOP" if layer_id == 1 else "BOTTOM"
+
+    # copper pours (POUR) -> Altium polygon primitives
+    for r in recs:
+        if r[0] != "POUR" or len(r) < 9:
+            continue
+        layer_id = int(r[4]) if str(r[4]).isdigit() else 0
+        if layer_id not in _COPPER_LAYER_IDS:
+            continue
+        ni = _net_from_pour(r)
+        for verts in _parse_pour_contours(r[8]):
+            if len(verts) >= 3:
+                out.polygons.append(
+                    PcbPolygon(
+                        net_index=ni,
+                        layer=_layer_label(layer_id),
+                        vertices=verts,
+                    )
+                )
+
+    # closed copper POLY regions (rare; most routing is LINE)
+    for r in recs:
+        if r[0] != "POLY" or len(r) < 7:
+            continue
+        layer_id = int(r[4]) if str(r[4]).isdigit() else 0
+        if layer_id not in _COPPER_LAYER_IDS:
+            continue
+        spec = r[6]
+        width = float(r[5]) if len(r) > 5 and r[5] is not None else 10.0
+        pts = _parse_lceda_path(spec)
+        if _path_is_closed(pts) and len(pts) >= 3:
+            out.polygons.append(
+                PcbPolygon(
+                    net_index=net_id(""),
+                    layer=_layer_label(layer_id),
+                    vertices=_strip_closing_point(pts),
+                )
+            )
+            continue
+        v6 = _LAYER_TO_V6.get(layer_id, 1)
+        for i in range(len(pts) - 1):
+            x1, y1 = pts[i]
+            x2, y2 = pts[i + 1]
+            out.tracks.append(
+                PcbTrack(
+                    layer=v6,
+                    net_index=net_id(""),
+                    x1=x1,
+                    y1=y1,
+                    x2=x2,
+                    y2=y2,
+                    width=width,
+                )
+            )
+
     # board outline: POLY segments on OUTLINE layer (11)
     for r in recs:
         if r[0] == "POLY" and len(r) >= 8 and str(r[4]) == "11":
@@ -217,13 +289,64 @@ def parse_epcb(path: str | Path) -> PcbNetlist:
     return out
 
 
+def _path_is_closed(pts: list[tuple[float, float]], tol: float = 0.01) -> bool:
+    if len(pts) < 3:
+        return False
+    x0, y0 = pts[0]
+    x1, y1 = pts[-1]
+    return math.hypot(x1 - x0, y1 - y0) <= tol
+
+
+def _strip_closing_point(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    if _path_is_closed(pts):
+        return pts[:-1]
+    return pts
+
+
+def _parse_pour_contours(raw) -> list[list[tuple[float, float]]]:
+    out: list[list[tuple[float, float]]] = []
+    if not isinstance(raw, list):
+        return out
+    for item in raw:
+        if not isinstance(item, list):
+            continue
+        verts = _parse_lceda_path(item)
+        if verts:
+            out.append(_strip_closing_point(verts) if _path_is_closed(verts) else verts)
+    return out
+
+
+def _parse_lceda_path(spec) -> list[tuple[float, float]]:
+    """Walk LCEDA pour/poly path specs into vertex lists."""
+    if not isinstance(spec, list) or not spec:
+        return []
+    if spec[0] == "R" and len(spec) >= 5:
+        x, y, w, h = float(spec[1]), float(spec[2]), float(spec[3]), float(spec[4])
+        return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+    if spec[0] == "CIRCLE" and len(spec) >= 4:
+        cx, cy, r = float(spec[1]), float(spec[2]), float(spec[3])
+        n = 16
+        return [
+            (cx + r * math.cos(2 * math.pi * i / n), cy + r * math.sin(2 * math.pi * i / n))
+            for i in range(n)
+        ]
+    pts: list[tuple[float, float]] = []
+    i = 0
+    while i < len(spec):
+        v = spec[i]
+        if isinstance(v, (int, float)):
+            if i + 1 < len(spec) and isinstance(spec[i + 1], (int, float)):
+                pts.append((float(v), float(spec[i + 1])))
+                i += 2
+                continue
+        elif v in ("L", "ARC"):
+            i += 1
+            continue
+        i += 1
+    return pts
+
+
 def _poly_points(spec) -> list[tuple[float, float]]:
     """Extract (x,y) points from POLY coordinate specs like
     [x1,y1,"L",x2,y2] or ["CIRCLE",x,y,r]."""
-    pts: list[tuple[float, float]] = []
-    if not isinstance(spec, list):
-        return pts
-    nums = [v for v in spec if isinstance(v, (int, float))]
-    for i in range(0, len(nums) - 1, 2):
-        pts.append((float(nums[i]), float(nums[i + 1])))
-    return pts
+    return _parse_lceda_path(spec)

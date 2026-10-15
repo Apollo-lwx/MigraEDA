@@ -16,8 +16,39 @@ import uuid as uuidlib
 from pathlib import Path
 
 from migraeda.eprj_write import _SCHEMA, _footprint_datastr, _IdGen, _n, _now, _uuid
-from migraeda.libmodel import LibFootprint
+from migraeda.libmodel import LibFootprint, LibPad
 from migraeda.pcbdoc import PcbNetlist
+
+_SHAPE_TO_EPRJ_PAD = {0: "ROUND", 1: "ELLIPSE", 2: "RECT", 3: "OVAL", 9: "RECT"}
+
+
+def footprint_library_from_pcb(
+    nl: PcbNetlist,
+) -> tuple[dict[str, LibFootprint], dict[str, str]]:
+    """Build minimal footprint library + pattern→uuid map from placed PCB pads."""
+    pads_by_pattern: dict[str, dict[str, LibPad]] = {}
+    for ci, c in enumerate(nl.components):
+        pat = c.pattern or "UNKNOWN"
+        bucket = pads_by_pattern.setdefault(pat, {})
+        for p in nl.pads:
+            if p.component_index != ci or p.name in bucket:
+                continue
+            bucket[p.name] = LibPad(
+                number=p.name,
+                x=p.x_mil - c.x_mil,
+                y=p.y_mil - c.y_mil,
+                size_x=p.size_x_mil or 10.0,
+                size_y=p.size_y_mil or 10.0,
+                hole=p.hole_mil,
+                shape=_SHAPE_TO_EPRJ_PAD.get(p.shape, "ELLIPSE"),
+            )
+    fp_uuid_by_pattern: dict[str, str] = {}
+    footprints: dict[str, LibFootprint] = {}
+    for pat, pads in pads_by_pattern.items():
+        fu = uuidlib.uuid4().hex
+        fp_uuid_by_pattern[pat] = fu
+        footprints[fu] = LibFootprint(name=pat, pads=list(pads.values()))
+    return footprints, fp_uuid_by_pattern
 
 _LAYER_RECORDS = [
     ["LAYER", 1, "TOP", "Top Layer", 3, "#ff0000", 1, "#ff0000", 1],
@@ -32,6 +63,25 @@ _LAYER_RECORDS = [
 
 _V6_TO_LCEDA = {1: 1, 32: 2}
 _SHAPE_TO_EPRJ = {1: "ELLIPSE", 2: "RECT", 3: "OVAL", 9: "RECT", 0: "ELLIPSE"}
+
+
+def _pour_contours_from_vertices(
+    verts: list[tuple[float, float]],
+) -> list[list]:
+    if not verts:
+        return []
+    if len(verts) == 4:
+        xs = [v[0] for v in verts]
+        ys = [v[1] for v in verts]
+        x0, x1 = min(xs), max(xs)
+        y0, y1 = min(ys), max(ys)
+        if x1 > x0 and y1 > y0:
+            return [["R", _n(x0), _n(y0), _n(x1 - x0), _n(y1 - y0), 0, 0]]
+    spec: list = [_n(verts[0][0]), _n(verts[0][1])]
+    for x, y in verts[1:]:
+        spec.extend(["L", _n(x), _n(y)])
+    spec.extend(["L", _n(verts[0][0]), _n(verts[0][1])])
+    return [spec]
 
 
 def _uid8(n: int) -> str:
@@ -127,6 +177,20 @@ def _pcb_datastr(nl: PcbNetlist, fp_uuid_by_pattern: dict[str, str],
             json.dumps(
                 ["LINE", ids.next(), 0, net, layer, _n(t.x1), _n(t.y1),
                  _n(t.x2), _n(t.y2), _n(t.width), 0],
+                ensure_ascii=False,
+            )
+        )
+
+    net_names = [name for name in nl.nets if name]
+    for pi, poly in enumerate(nl.polygons):
+        layer = 2 if (poly.layer or "").upper() == "BOTTOM" else 1
+        net = nl.nets[poly.net_index] if 0 <= poly.net_index < len(nl.nets) else ""
+        idx = net_names.index(net) if net in net_names else 0
+        contours = _pour_contours_from_vertices(poly.vertices)
+        lines.append(
+            json.dumps(
+                ["POUR", ids.next(), 0, net, layer, 0.2, f"POUR{pi + 1}", idx,
+                 contours, ["SOLID", 6], 0, 0],
                 ensure_ascii=False,
             )
         )

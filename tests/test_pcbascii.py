@@ -10,6 +10,7 @@ from migraeda.pcbdoc import (
     PcbComponent,
     PcbNetlist,
     PcbPad,
+    PcbPolygon,
     PcbTrack,
     PcbVia,
 )
@@ -43,6 +44,9 @@ def _demo_board() -> PcbNetlist:
         PcbTrack(layer=32, net_index=1, x1=50, y1=100, x2=200, y2=200, width=12),
     ]
     nl.board_outline = [(0.0, 0.0), (0.0, 400.0), (400.0, 400.0), (0.0, 0.0)]
+    nl.polygons.append(
+        PcbPolygon(net_index=1, layer="TOP", vertices=[(10.0, 10.0), (90.0, 10.0), (90.0, 90.0)])
+    )
     return nl
 
 
@@ -57,6 +61,9 @@ def test_pcb_ascii_roundtrip(tmp_path: Path) -> None:
     assert len(back.pads) == 5
     assert len(back.tracks) == 2
     assert len(back.vias) == 1
+    assert len(back.polygons) == 1
+    assert back.polygons[0].vertices == src.polygons[0].vertices
+    assert back.nets[back.polygons[0].net_index] == "GND"
     assert back.board_outline == src.board_outline
 
     # net names preserved

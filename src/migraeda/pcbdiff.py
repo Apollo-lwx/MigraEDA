@@ -276,9 +276,12 @@ def compare_pcb(a: PcbNetlist, b: PcbNetlist, pos_tol_mil: float = 2.0,
 
 
 def render_pcbdiff_report(res: PcbDiffResult, name_a: str, name_b: str) -> str:
+    from migraeda.report_common import render_pcbdiff_scope
+
     L: list[str] = []
     w = L.append
-    w("# PCB 级验证报告")
+    L.extend(render_pcbdiff_scope())
+    w("# PCB 几何/铜皮统计报告（pcbdiff）")
     w("")
     w(f"| A | `{name_a}` |")
     w(f"|---|---|")
@@ -297,6 +300,12 @@ def render_pcbdiff_report(res: PcbDiffResult, name_a: str, name_b: str) -> str:
     w(f"- 过孔：A {res.vias_a} vs B {res.vias_b}，未配对 {len(res.vias_unmatched)}")
     w(f"- 铜皮差异项：{len(res.copper_diffs)}；A 独有网络 {len(res.nets_only_a)}，"
       f"B 独有网络 {len(res.nets_only_b)}")
+    w("")
+    w("### 如何解读 FAIL")
+    w("")
+    w("- **引脚网络未变**但本报告 FAIL：常见（坐标系、拼板、铺铜表达方式不同）。")
+    w("- 请以 **`selfcheck --pcb` + `verify`（eprj PCB ↔ 转换 PcbDoc）** 作为转换保真依据。")
+    w("- **移位 0 / 焊盘偏移 0** 但铜皮差异多：多为 **走线条数/铺铜统计** 不同，非 necessarily 移位。")
     w("")
     for title, items in (("移位元件", res.comps_moved), ("偏移焊盘", res.pads_moved),
                          ("铜皮差异", res.copper_diffs),

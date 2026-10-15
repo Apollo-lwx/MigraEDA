@@ -11,8 +11,24 @@ from migraeda.eprj_write import write_eprj
 from migraeda.ir import SchematicIR, pin_abs
 from migraeda.lvs import LvsResult, compare_netlists
 from migraeda.netlist_model import NetlistModel, SchComponent
+from migraeda.pcbdoc import PcbNetlist
 from migraeda.schdoc import parse_schdoc, parse_schdoc_ir
 from migraeda.schgeom import PinPoint, SchematicConnectivity
+
+
+def netlist_from_pcb(nl: PcbNetlist, source: str = "pcb") -> NetlistModel:
+    """Pin-level netlist from a PcbNetlist (pad connectivity, not geometry)."""
+    m = NetlistModel(source=source)
+    seen: set[str] = set()
+    for c in nl.components:
+        if c.designator and c.designator not in seen:
+            seen.add(c.designator)
+            m.components[c.designator] = SchComponent(
+                ref=c.designator, value=c.lib_reference, footprint=c.pattern
+            )
+    for (ref, pin), net in nl.pin_net_map().items():
+        m.pin_nets[(ref, pin)] = net
+    return m
 
 
 def load_ir(path: str | Path) -> SchematicIR:
@@ -73,11 +89,19 @@ def netlist_from_ir(ir: SchematicIR) -> NetlistModel:
     return model
 
 
-def load_netlist(path: str | Path) -> NetlistModel:
-    """Parse any supported file into a NetlistModel (for `verify`)."""
+def load_netlist(path: str | Path, *, pcb: bool = False) -> NetlistModel:
+    """Parse any supported file into a NetlistModel (for `verify`).
+
+    When ``pcb=True`` on an ``.eprj``, use the embedded PCB (``PAD_NET``) instead
+    of the schematic — the correct baseline for ``convert --to adpcb`` checks.
+    """
     path = Path(path)
     suf = path.suffix.lower()
     if suf == ".eprj":
+        if pcb:
+            from migraeda.epcb import parse_epcb
+
+            return netlist_from_pcb(parse_epcb(path), source=f"eprj-pcb:{path.name}")
         return parse_eprj(path)
     if suf == ".schdoc":
         with open(path, "rb") as fh:
@@ -96,17 +120,7 @@ def load_netlist(path: str | Path) -> NetlistModel:
             nl = parse_pcb_ascii(path)
         else:
             nl = parse_pcbdoc(path)
-        m = NetlistModel(source=f"pcbdoc:{path.name}")
-        seen: set[str] = set()
-        for c in nl.components:
-            if c.designator and c.designator not in seen:
-                seen.add(c.designator)
-                m.components[c.designator] = SchComponent(
-                    ref=c.designator, value=c.lib_reference, footprint=c.pattern
-                )
-        for (ref, pin), nets in nl.pin_net_sets().items():
-            m.pin_nets[(ref, pin)] = "|".join(sorted(nets))
-        return m
+        return netlist_from_pcb(nl, source=f"pcbdoc:{path.name}")
     raise ValueError(f"unsupported input format: {path.suffix}")
 
 
@@ -177,8 +191,11 @@ class PcbConvertResult:
     pads: int
     tracks: int
     vias: int
+    polygons: int = 0
     verify_grade: str = ""
     verify_details: str = ""
+    pin_mismatches: int = 0
+    common_pins: int = 0
 
     @property
     def out_path(self) -> Path:
@@ -377,37 +394,54 @@ def roundtrip_pcb(src: str | Path, out_dir: str | Path | None = None) -> PcbRoun
 
 
 def convert_pcb(src: str | Path, out_dir: str | Path | None = None,
-                verify: bool = True) -> PcbConvertResult:
+                verify: bool = True, panel_rows: int = 1) -> PcbConvertResult:
     """Convert the PCB document inside an .eprj into an ASCII .PcbDoc,
     with pcbdiff loop verification against the source."""
     from migraeda.epcb import parse_epcb
     from migraeda.pcbascii import parse_pcb_ascii, write_pcb_ascii
     from migraeda.pcbdiff import compare_pcb
+    from migraeda.pcb_panel import panelize_rows
 
     src = Path(src)
     if src.suffix.lower() != ".eprj":
         raise ValueError(f"PCB conversion currently supports .eprj input, got {src.suffix}")
     nl = parse_epcb(src)
+    export_nl = panelize_rows(nl, panel_rows)
     out_dir = Path(out_dir) if out_dir else src.parent / "out"
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / (src.stem + ".PcbDoc")
-    write_pcb_ascii(nl, out)
+    write_pcb_ascii(export_nl, out)
 
     res = PcbConvertResult(
         output=out,
-        components=len(nl.components),
-        pads=len(nl.pads),
-        tracks=len(nl.tracks),
-        vias=len(nl.vias),
+        components=len(export_nl.components),
+        pads=len(export_nl.pads),
+        tracks=len(export_nl.tracks),
+        vias=len(export_nl.vias),
+        polygons=len(export_nl.polygons),
     )
     if verify:
         back = parse_pcb_ascii(out)
-        diff = compare_pcb(nl, back, pos_tol_mil=1.0)
-        res.verify_grade = diff.grade
+        lvs = compare_netlists(
+            netlist_from_pcb(export_nl, source=f"eprj-pcb:{src.name}"),
+            netlist_from_pcb(back, source=f"pcbdoc:{out.name}"),
+        )
+        diff = compare_pcb(export_nl, back, pos_tol_mil=1.0)
+        res.common_pins = lvs.common_pin_count
+        res.pin_mismatches = len(lvs.pin_mismatches)
+        if lvs.pin_mismatches or diff.grade == "FAIL":
+            res.verify_grade = "FAIL"
+        elif diff.grade == "WARN":
+            res.verify_grade = "WARN"
+        else:
+            res.verify_grade = "PASS"
+        ok_pins = lvs.common_pin_count - len(lvs.pin_mismatches)
         res.verify_details = (
-            f"comps {diff.comps_common}/{len(nl.components)}, "
-            f"pads {diff.pads_checked} checked/{len(diff.pads_moved)} moved, "
-            f"copper diffs {len(diff.copper_diffs)}"
+            f"pins {ok_pins}/{lvs.common_pin_count}, "
+            f"tracks {len(export_nl.tracks)}/{len(back.tracks)}, "
+            f"vias {len(export_nl.vias)}/{len(back.vias)}, "
+            f"polygons {len(export_nl.polygons)}/{len(back.polygons)}, "
+            f"geom {diff.grade}"
         )
     return res
 
@@ -440,8 +474,25 @@ def libconvert(src: str | Path, out_dir: str | Path | None = None,
     return res
 
 
-def convert(src: str | Path, to: str, out_dir: str | Path | None = None,
-            verify: bool = True) -> ConvertResult:
+def _load_pcb_netlist(path: Path):
+    from migraeda.pcbascii import parse_pcb_ascii
+    from migraeda.pcbdoc import parse_pcbdoc
+
+    with open(path, "rb") as fh:
+        head = fh.read(16)
+    if head.startswith(b"|RECORD"):
+        return parse_pcb_ascii(path)
+    return parse_pcbdoc(path)
+
+
+def convert(
+    src: str | Path,
+    to: str,
+    out_dir: str | Path | None = None,
+    verify: bool = True,
+    panel_rows: int = 1,
+    with_pcb: str | Path | None = None,
+) -> ConvertResult:
     """Convert a schematic between .eprj and .SchDoc, with loop verification.
 
     to: "ad"   (produce ASCII .SchDoc from .eprj)
@@ -458,11 +509,12 @@ def convert(src: str | Path, to: str, out_dir: str | Path | None = None,
         direction = "eprj -> ad-ascii-schdoc"
         reparsed: NetlistModel = parse_schdoc_ascii(out)
     elif to == "adpcb":
-        return convert_pcb(src, out_dir=out_dir, verify=verify)
+        return convert_pcb(src, out_dir=out_dir, verify=verify, panel_rows=panel_rows)
     elif to == "eprj":
         out = out_dir / (src.stem + ".eprj")
-        write_eprj(ir, out)
-        direction = "schdoc -> eprj"
+        pcb_nl = _load_pcb_netlist(Path(with_pcb)) if with_pcb else None
+        write_eprj(ir, out, pcb_nl=pcb_nl)
+        direction = "schdoc+pcb -> eprj" if pcb_nl else "schdoc -> eprj"
         reparsed = parse_eprj(out)
     else:
         raise ValueError(f"unknown target format: {to!r} (use 'ad'/'adpcb'/'eprj')")

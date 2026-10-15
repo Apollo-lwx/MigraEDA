@@ -7,6 +7,8 @@ from pathlib import Path
 
 from migraeda.lvs import LvsResult, norm_ref
 from migraeda.netlist_model import NetlistModel
+from migraeda.report_common import detect_comparison_kind, render_scope_and_pitfalls
+from migraeda.report_common import detect_comparison_kind, render_scope_and_pitfalls
 
 
 def _verdict(res: LvsResult) -> str:
@@ -32,8 +34,10 @@ def _stats_of(m: NetlistModel) -> str:
 def render_verify_report(a: NetlistModel, b: NetlistModel, res: LvsResult) -> str:
     L: list[str] = []
     w = L.append
-    w("# 设计文件功能验证报告")
+    w("# 设计文件功能验证报告（LVS）")
     w("")
+    kind = detect_comparison_kind(a.source, b.source)
+    L.extend(render_scope_and_pitfalls(kind))
     w("| 侧 | 文件 | 解析统计 |")
     w("|---|---|---|")
     w(f"| A | `{res.a_name}` | {_stats_of(a)} |")
@@ -125,6 +129,16 @@ def render_verify_report(a: NetlistModel, b: NetlistModel, res: LvsResult) -> st
         for n in m.notes:
             w(f"- [{m.source}] {n}")
     w("- 比对基于静态网表，不含电气仿真；命名单元以两边文件为准。")
+    w("- **不含**：走线几何、铺铜轮廓、过孔在 AD 二进制流中的解析完整性、PDF 视觉。")
+    w("")
+    w("## 7. 与其它报告的分工")
+    w("")
+    w("| 问题 | 应查看 |")
+    w("|---|---|")
+    w("| 转换有没有改引脚/走线/过孔/铺铜条数 | `selfcheck --pcb` / convert 的 `fidelity-verify` |")
+    w("| 板子布局/铜皮统计是否像 A02 | `pcbdiff`（参考，跨版通常 FAIL） |")
+    w("| 原厂 AD 原理图与 PCB 是否一致 | `verify SchDoc PcbDoc` |")
+    w("| 嘉立创 eprj 能否打开 PCB 页 | `selfcheck` 是否提示 PCB 桩；或 `--with-pcb` 重建 |")
     w("")
     return "\n".join(L)
 
