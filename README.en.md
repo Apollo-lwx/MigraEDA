@@ -343,6 +343,17 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
+Before opening a PR, please read [CONTRIBUTING.md](CONTRIBUTING.md): by submitting, you agree to license your contribution under MIT and to grant the maintainer the right to relicense it (including under commercial terms) in future versions.
+
+## Commercial support
+
+Personal use is free forever (MIT).
+
+If your company needs **bulk migration of legacy designs**, **custom format support** (PADS, Cadence, etc.), **CI verification rollouts**, or technical support and training, get in touch:
+
+- Describe your needs in [GitHub Issues](https://github.com/Apollo-lwx/MigraEDA/issues)
+- Email: m18804894978@163.com
+
 ## Local MCP
 
 A local stdio server for clients such as Cursor and WorkBuddy. Design files are read and written only on the machine that runs the process. There is no remote endpoint.

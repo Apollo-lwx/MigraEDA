@@ -343,6 +343,17 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
+提交 PR 前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)：提交即表示你同意以 MIT 协议授权你的贡献，并授予维护者在未来版本中以其他许可（包括商业许可）再授权的权利。
+
+## 商业支持
+
+个人使用永远免费（MIT）。
+
+如果你所在的公司需要**批量迁移历史设计**、**定制格式支持**（PADS / Cadence 等）、**CI 验证流程落地**，或需要技术支持和培训，欢迎联系：
+
+- 在 [GitHub Issues](https://github.com/Apollo-lwx/MigraEDA/issues) 描述需求
+- 邮件：m18804894978@163.com
+
 ## 本地 MCP
 
 本机 stdio 服务，给 Cursor、WorkBuddy 这类客户端调用。设计文件只在运行这条命令的电脑上读写，没有远程接口。
