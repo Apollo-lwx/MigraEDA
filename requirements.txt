@@ -1,2 +1,3 @@
-# Runtime: stdlib only. Dev/test:
+# Runtime: olefile (pure Python, reads Altium binary OLE containers).
+# Dev/test:
 pytest>=7.0

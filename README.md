@@ -7,13 +7,14 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
   <a href="https://www.python.org/downloads/"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg"></a>
+  <a href="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/Apollo-lwx/MigraEDA"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Apollo-lwx/MigraEDA?style=flat"></a>
 </p>
 
 | | |
 |---|---|
 | 仓库 | [github.com/Apollo-lwx/MigraEDA](https://github.com/Apollo-lwx/MigraEDA) |
-| 安装 | `pip install -e ".[dev]"`（Python 3.10+，运行时零第三方依赖） |
+| 安装 | `pip install -e ".[dev]"`（Python 3.10+，运行时只依赖 olefile 一个纯 Python 小包） |
 | 许可 | [MIT](LICENSE) |
 | 当前版本 | 0.1.0 |
 
@@ -92,7 +93,7 @@ loop-verify: common_pins=367 mismatched=2 nets_matched=115
 - **PCB 几何级闭环验证**：板框、元件布局、焊盘位置、过孔数量与位置、每个网络的走线长度与铜皮统计，先刚体对齐再比对，容差可调
 - **三重独立验证**：转换内环、双文件比对、A→B→A' 往返比对
 - **CI 友好**：退出码 PASS = 0 / WARN = 1 / FAIL = 2，报告是普通 Markdown，可直接归档为构建产物
-- **零依赖、纯本地**：运行时无第三方包，没有账号、没有上传，设计文件不出本机
+- **零重型依赖、纯本地**：运行时只需 olefile 一个纯 Python 小包，没有账号、没有上传，设计文件不出本机
 - **MCP 服务**：内置 stdio MCP server，可在 Cursor、WorkBuddy 里直接调用
 
 ## 支持的格式
@@ -306,7 +307,7 @@ migraeda convert 原理图.SchDoc --to eprj --with-pcb 板子.PcbDoc
 <details>
 <summary>能放进 CI 吗？</summary>
 
-可以。安装只需 Python 3.10+，运行时没有第三方包。`mismatched` 非零或 PCB 分级为 FAIL 时退出码为 2。报告是普通 Markdown，可直接作为构建产物归档。
+可以。安装只需 Python 3.10+，运行时依赖只有 olefile 一个纯 Python 小包。`mismatched` 非零或 PCB 分级为 FAIL 时退出码为 2。报告是普通 Markdown，可直接作为构建产物归档。
 
 </details>
 

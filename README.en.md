@@ -7,13 +7,14 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
   <a href="https://www.python.org/downloads/"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg"></a>
+  <a href="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/Apollo-lwx/MigraEDA"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Apollo-lwx/MigraEDA?style=flat"></a>
 </p>
 
 | | |
 |---|---|
 | Repository | [github.com/Apollo-lwx/MigraEDA](https://github.com/Apollo-lwx/MigraEDA) |
-| Install | `pip install -e ".[dev]"` (Python 3.10+, no third-party runtime dependencies) |
+| Install | `pip install -e ".[dev]"` (Python 3.10+, single pure-Python runtime dependency: olefile) |
 | License | [MIT](LICENSE) |
 | Version | 0.1.0 |
 
@@ -92,7 +93,7 @@ Conversion and verification run in the same command. The output is parsed with t
 - **Geometry-level closed loop for PCB**: board outline, component placement, pad positions, via count and positions, and per-net track length and copper statistics — rigidly aligned before comparison, with adjustable tolerance
 - **Three independent checks**: conversion inner loop, two-file comparison, and an A→B→A' round trip
 - **CI-friendly**: exit codes PASS = 0 / WARN = 1 / FAIL = 2, reports are plain Markdown you can archive as build artifacts
-- **Zero-dependency and local-only**: no third-party packages at runtime, no account, no upload — design files never leave your machine
+- **Lean and local-only**: a single pure-Python runtime dependency (olefile), no account, no upload — design files never leave your machine
 - **MCP server**: a built-in stdio MCP server, callable from clients such as Cursor and WorkBuddy
 
 ## Formats
@@ -306,7 +307,7 @@ Yes. Converted symbols are boxes placed at the pin coordinates. Pin numbers, pos
 <details>
 <summary>Can this run in CI?</summary>
 
-Yes. It needs Python 3.10+ and no third-party packages at runtime. A non-zero `mismatched` count, or a PCB grade of FAIL, exits 2. Reports are plain Markdown and can be archived as build artifacts.
+Yes. It needs Python 3.10+, and olefile is the only third-party runtime package. A non-zero `mismatched` count, or a PCB grade of FAIL, exits 2. Reports are plain Markdown and can be archived as build artifacts.
 
 </details>
 
