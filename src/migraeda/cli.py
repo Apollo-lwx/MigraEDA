@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from migraeda import __version__
 from migraeda.audit import rollback
-from migraeda.convert import convert, load_netlist
+from migraeda.convert import ARTIFACT_DIRNAME, convert, load_netlist
 from migraeda.diff import diff_stats
 from migraeda.lvs import compare_netlists
 from migraeda.migrate import kicad_available, run_migrate
@@ -168,7 +167,7 @@ def _cmd_verify(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="migraeda",
-        description="MigraEDA — verifiable EasyEDA Pro → KiCad migration.",
+        description="MigraEDA — pin-level verified conversion between JLCEDA (.eprj) and Altium Designer.",
     )
     p.add_argument("--version", action="version", version=f"migraeda {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
@@ -207,7 +206,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--to", required=True, choices=["ad", "eprj", "adpcb"],
                    help="Target: 'ad' (ASCII .SchDoc), 'eprj', or 'adpcb' (ASCII .PcbDoc)")
     c.add_argument("-o", "--output", default=None,
-                   help="Output directory (default: <input_dir>/out)")
+                   help=f"Output directory (default: <input_dir>/{ARTIFACT_DIRNAME})")
     c.add_argument("--no-verify", action="store_true",
                    help="Skip closed-loop verification of the converted file")
     c.add_argument("--panel-rows", type=int, default=1, metavar="N",
@@ -248,7 +247,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     lc = sub.add_parser("libconvert", help="Convert a library source into an .eprj library package")
     lc.add_argument("input", help="Library source (.eprj/.SchLib/.PcbLib/.PcbDoc)")
-    lc.add_argument("-o", "--output", default=None, help="Output directory (default: <input_dir>/out)")
+    lc.add_argument("-o", "--output", default=None,
+                    help=f"Output directory (default: <input_dir>/{ARTIFACT_DIRNAME})")
     lc.add_argument("--no-verify", action="store_true", help="Skip loop verification")
     lc.set_defaults(func=_cmd_libconvert)
 
@@ -259,7 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rt.add_argument("input", help="Source file (.eprj or .SchDoc)")
     rt.add_argument("-o", "--output", default=None,
-                    help="Output dir (default: <input_dir>/out/roundtrip)")
+                    help=f"Output dir (default: <input_dir>/{ARTIFACT_DIRNAME}/roundtrip)")
     rt.set_defaults(func=_cmd_roundtrip)
 
     s = sub.add_parser("samples", help="List design samples under samples/ (see samples/README.md)")

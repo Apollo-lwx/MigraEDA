@@ -16,8 +16,8 @@ def _mk_tree(root: Path) -> Path:
     (proj / "lib.SchLib").write_bytes(b"x")
     (proj / "lib.PcbLib").write_bytes(b"x")
     (proj / "notes.txt").write_text("ignore me")
-    (proj / "out").mkdir()
-    (proj / "out" / "report.md").write_text("ignored dir")
+    (proj / ".migraeda").mkdir()
+    (proj / ".migraeda" / "report.md").write_text("ignored dir")
     return root
 
 
@@ -39,7 +39,7 @@ def test_scan_samples(tmp_path: Path) -> None:
     assert ss.first("altium_pcb").name == "b.PcbDoc"
     assert ss.first("altium_symbol_lib").name == "lib.SchLib"
     assert ss.first("altium_footprint_lib").name == "lib.PcbLib"
-    # notes.txt and out/ are not classified
+    # notes.txt and .migraeda/ are not classified
     assert all("notes.txt" not in f.name for fs in ss.files.values() for f in fs)
     text = describe(root)
     assert "G318" in text and "AD封装库" in text

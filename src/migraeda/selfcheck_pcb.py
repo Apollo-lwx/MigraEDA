@@ -77,7 +77,7 @@ def render_selfcheck_pcb_report(
     if raw_bytes < 100:
         w(f"- **状态**：❌ PCB 页为空白占位（dataStr ≈ {raw_bytes} B，仅 `DOCTYPE` 桩）")
         w("- **现象**：嘉立创客户端打开 **PCB 页空白**；原理图页可能有内容。")
-        w("- **修复**：`migraeda convert <SchDoc> --to eprj --with-pcb <PcbDoc> -o out/` 重新生成。")
+        w("- **修复**：`migraeda convert <SchDoc> --to eprj --with-pcb <PcbDoc>` 重新生成（写入源文件旁的 `.migraeda/`）。")
         w("")
         w("## 2. 转换结果")
         w("")
@@ -155,7 +155,7 @@ def render_selfcheck_pcb_report(
         w("")
         w("```bash")
         w(f"migraeda selfcheck --pcb \"{eprj.as_posix()}\" \\")
-        w(f"  --converted \".../out/{eprj.stem}.PcbDoc\" --report out/fidelity_pcb.md")
+        w(f"  --converted \"{eprj.parent.as_posix()}/.migraeda/{eprj.stem}.PcbDoc\" --report .migraeda/fidelity_pcb.md")
         w("```")
         w("")
 

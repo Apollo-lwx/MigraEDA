@@ -9,7 +9,6 @@ Net assignment is written as NET=<net name> on pads/tracks/vias.
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 from migraeda.pcbdoc import (

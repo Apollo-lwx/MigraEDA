@@ -1,4 +1,4 @@
-from migraeda.audit import load_record, record_migration, rollback
+from migraeda.audit import load_record, rollback
 from migraeda.migrate import run_migrate
 
 

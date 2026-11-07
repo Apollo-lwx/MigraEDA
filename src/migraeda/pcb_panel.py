@@ -5,14 +5,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 from migraeda.pcbdoc import (
-    PcbArc,
-    PcbComponent,
-    PcbFill,
     PcbNetlist,
-    PcbPad,
     PcbPolygon,
-    PcbTrack,
-    PcbVia,
 )
 
 

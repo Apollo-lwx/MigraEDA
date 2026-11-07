@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from migraeda.adascii import parse_schdoc_ascii, write_schdoc_ascii
-from migraeda.convert import netlist_from_ir
+from migraeda.convert import convert, netlist_from_ir
 from migraeda.eprj_sqlite import parse_eprj
 from migraeda.eprj_write import write_eprj
 from migraeda.ir import (
@@ -122,3 +122,11 @@ def test_eprj_is_sqlite(tmp_path: Path) -> None:
         assert '"WIRE"' in sch_data and '"COMPONENT"' in sch_data
     finally:
         con.close()
+
+
+def test_convert_defaults_to_dot_migraeda(tmp_path: Path) -> None:
+    src = tmp_path / "demo.eprj"
+    write_eprj(_demo_ir(), src, project_name="demo")
+    res = convert(src, "ad")
+    assert res.out_path == tmp_path / ".migraeda" / "demo.SchDoc"
+    assert res.out_path.is_file()

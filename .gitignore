@@ -56,3 +56,10 @@ credentials*
 # only the convention doc is tracked)
 samples/*
 !samples/README.md
+
+# Marketing / launch copy drafts (never push to the public repo)
+drafts/
+
+# Local tooling configs (editor MCP, code-hospital — contain machine-local paths)
+.cursor/
+code-hospital.yaml

@@ -284,7 +284,7 @@ def render_pcbdiff_report(res: PcbDiffResult, name_a: str, name_b: str) -> str:
     w("# PCB 几何/铜皮统计报告（pcbdiff）")
     w("")
     w(f"| A | `{name_a}` |")
-    w(f"|---|---|")
+    w("|---|---|")
     w(f"| B | `{name_b}` |")
     w("")
     w(f"## 总体结论：**{res.grade}**")

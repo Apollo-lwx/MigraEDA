@@ -21,7 +21,6 @@ from migraeda.ir import (
     IRPowerPort,
     IRWire,
     SchematicIR,
-    pin_abs,
 )
 from migraeda.netlist_model import NetlistModel, SchComponent
 from migraeda.schgeom import PinPoint, SchematicConnectivity

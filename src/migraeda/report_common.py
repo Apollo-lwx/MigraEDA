@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 
 def detect_comparison_kind(source_a: str, source_b: str) -> str:
@@ -36,7 +35,7 @@ def render_scope_and_pitfalls(comparison_kind: str) -> list[str]:
     w("")
     w("| 场景 | 正确金标准 | 误用报告 |")
     w("|---|---|---|")
-    w("| `A01.eprj` → AD 转换是否改线/改网 | 同一份 eprj 的 **PCB** vs `out/*.PcbDoc` | "
+    w("| `A01.eprj` → AD 转换是否改线/改网 | 同一份 eprj 的 **PCB** vs `.migraeda/*.PcbDoc` | "
       "用 A02 原厂 PcbDoc 或原理图 vs PCB |")
     w("| 原厂 AD 原理图↔PCB 是否自洽 | `A02.SchDoc` vs `A02.PcbDoc` | 用嘉立创 eprj 比 A02 |")
     w("| 走线条数为何 2501 vs ~2 万 | 看 eprj 内 **`LINE` 原稿条数** | 直接比 AD 总 Track（含丝印/拼板/碎化铺铜） |")
@@ -45,9 +44,9 @@ def render_scope_and_pitfalls(comparison_kind: str) -> list[str]:
     w("### 推荐验收命令（嘉立创 → AD PCB）")
     w("")
     w("```bash")
-    w("migraeda convert <工程.eprj> --to adpcb -o out/")
-    w("migraeda verify <工程.eprj> out/<工程>.PcbDoc --report out/verify_convert.md")
-    w("migraeda selfcheck --pcb <工程.eprj> --converted out/<工程>.PcbDoc --report out/fidelity_pcb.md")
+    w("migraeda convert <工程.eprj> --to adpcb")
+    w("migraeda verify <工程.eprj> .migraeda/<工程>.PcbDoc --report .migraeda/verify_convert.md")
+    w("migraeda selfcheck --pcb <工程.eprj> --converted .migraeda/<工程>.PcbDoc --report .migraeda/fidelity_pcb.md")
     w("```")
     w("")
     if "原理图" in comparison_kind and "PCB" in comparison_kind:

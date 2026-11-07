@@ -8,7 +8,6 @@ the user can paste this output for debugging without sharing the design.
 
 from __future__ import annotations
 
-import struct
 import traceback
 import zipfile
 from collections import Counter

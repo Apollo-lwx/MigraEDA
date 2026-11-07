@@ -15,6 +15,13 @@ from migraeda.pcbdoc import PcbNetlist
 from migraeda.schdoc import parse_schdoc, parse_schdoc_ir
 from migraeda.schgeom import PinPoint, SchematicConnectivity
 
+# Conversion and round-trip files land here, beside the source. Already gitignored.
+ARTIFACT_DIRNAME = ".migraeda"
+
+
+def default_artifact_dir(src: Path, *parts: str) -> Path:
+    return src.parent.joinpath(ARTIFACT_DIRNAME, *parts)
+
 
 def netlist_from_pcb(nl: PcbNetlist, source: str = "pcb") -> NetlistModel:
     """Pin-level netlist from a PcbNetlist (pad connectivity, not geometry)."""
@@ -232,7 +239,7 @@ def roundtrip(src: str | Path, out_dir: str | Path | None = None) -> RoundtripRe
 
     src = Path(src)
     suf = src.suffix.lower()
-    out_dir = Path(out_dir) if out_dir else src.parent / "out" / "roundtrip"
+    out_dir = Path(out_dir) if out_dir else default_artifact_dir(src, "roundtrip")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if suf == ".eprj":
@@ -325,7 +332,7 @@ def roundtrip_pcb(src: str | Path, out_dir: str | Path | None = None) -> PcbRoun
     from migraeda.pcbdiff import compare_pcb
 
     src = Path(src)
-    out_dir = Path(out_dir) if out_dir else src.parent / "out" / "roundtrip"
+    out_dir = Path(out_dir) if out_dir else default_artifact_dir(src, "roundtrip")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # carry-over metadata: footprint library + designator->uuids
@@ -407,7 +414,7 @@ def convert_pcb(src: str | Path, out_dir: str | Path | None = None,
         raise ValueError(f"PCB conversion currently supports .eprj input, got {src.suffix}")
     nl = parse_epcb(src)
     export_nl = panelize_rows(nl, panel_rows)
-    out_dir = Path(out_dir) if out_dir else src.parent / "out"
+    out_dir = Path(out_dir) if out_dir else default_artifact_dir(src)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / (src.stem + ".PcbDoc")
     write_pcb_ascii(export_nl, out)
@@ -455,7 +462,7 @@ def libconvert(src: str | Path, out_dir: str | Path | None = None,
 
     src = Path(src)
     lib = load_library(src)
-    out_dir = Path(out_dir) if out_dir else src.parent / "out"
+    out_dir = Path(out_dir) if out_dir else default_artifact_dir(src)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / (src.stem + ".eprj")
     write_library_eprj(lib, out, project_name=src.stem)
@@ -500,7 +507,7 @@ def convert(
     """
     src = Path(src)
     ir = load_ir(src)
-    out_dir = Path(out_dir) if out_dir else src.parent / "out"
+    out_dir = Path(out_dir) if out_dir else default_artifact_dir(src)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if to == "ad":

@@ -17,7 +17,7 @@ samples/
     *.SchLib           # Altium 符号库（可选）
     *.PcbLib           # Altium 封装库（可选）
     *.PrjPcb           # Altium 工程文件（可选）
-    out/               # 工具输出（转换结果/验证报告），不入库、可随便删
+    .migraeda/         # 工具默认输出（转换结果/验证报告），不入库、可随便删
 ```
 
 ## 规则
@@ -30,7 +30,7 @@ samples/
    - `convert`：`.eprj` 或 `.SchDoc`
    - `pcbdiff`：两份 `.PcbDoc`（嘉立创 PCB 解析需要**含 PCB 数据**的 `.eprj`）
    - `libdiff` / `libconvert`：`.eprj / .SchLib / .PcbLib / .PcbDoc`
-5. 生成的报告/转换结果请写到项目内的 `out/`（保持源文件目录干净）。
+5. 不写 `-o` 时，转换和往返结果写到源文件旁边的 `.migraeda/`（往返在 `.migraeda/roundtrip/`）。报告也可以放进这个目录。
 
 ## 私有文件与路径
 

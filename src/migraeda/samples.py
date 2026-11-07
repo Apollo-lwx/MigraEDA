@@ -74,7 +74,7 @@ def scan_samples(root: str | Path = "samples") -> dict[str, SampleSet]:
         ss = SampleSet(name=proj_dir.name, path=proj_dir)
         for f in sorted(proj_dir.iterdir()):
             if not f.is_file():
-                continue  # out/ and subdirs are ignored by convention
+                continue  # .migraeda/ and other subdirs are ignored by convention
             role = classify(f)
             if role:
                 ss.files.setdefault(role, []).append(f)

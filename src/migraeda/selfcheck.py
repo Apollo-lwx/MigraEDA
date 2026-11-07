@@ -15,7 +15,6 @@ from collections import Counter
 from pathlib import Path
 
 from migraeda.convert import load_netlist
-from migraeda.netlist_model import NetlistModel
 
 
 def selfcheck(path: str | Path) -> str:
@@ -81,7 +80,7 @@ def selfcheck(path: str | Path) -> str:
             if a != b and a.upper() == b.upper():
                 variants.add((a, b))
     if variants:
-        w(f"  ⚠ case-variant net names (merge in Altium semantics): "
+        w("  ⚠ case-variant net names (merge in Altium semantics): "
           + ", ".join(f"{a}~{b}" for a, b in sorted(variants)[:8]))
 
     # name conflicts recorded by parser

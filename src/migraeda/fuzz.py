@@ -6,7 +6,6 @@ candidate parser/converter bug — with a reproducible seed attached.
 from __future__ import annotations
 
 import random
-import re
 import shutil
 import tempfile
 from dataclasses import dataclass, field
