@@ -34,6 +34,8 @@ MigraEDA 的做法很直接：**写出文件后立刻读回来，自己跟自己
 
 ## 30 秒看效果
 
+![MigraEDA demo](docs/demo.gif)
+
 ```bash
 migraeda convert 板子.eprj --to ad
 ```

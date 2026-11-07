@@ -34,6 +34,8 @@ MigraEDA's approach is simple: **write the file, immediately parse it back, and 
 
 ## See it in 30 seconds
 
+![MigraEDA demo](docs/demo.gif)
+
 ```bash
 migraeda convert board.eprj --to ad
 ```
