@@ -63,3 +63,6 @@ drafts/
 # Local tooling configs (editor MCP, code-hospital — contain machine-local paths)
 .cursor/
 code-hospital.yaml
+
+# JLCEDA extension (separate distribution, not part of the OSS repo)
+extension/
