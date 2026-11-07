@@ -7,6 +7,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
   <a href="https://www.python.org/downloads/"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg"></a>
+  <a href="https://pypi.org/project/migraeda/"><img alt="PyPI" src="https://img.shields.io/pypi/v/migraeda"></a>
   <a href="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/Apollo-lwx/MigraEDA"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Apollo-lwx/MigraEDA?style=flat"></a>
 </p>
@@ -14,7 +15,7 @@
 | | |
 |---|---|
 | Repository | [github.com/Apollo-lwx/MigraEDA](https://github.com/Apollo-lwx/MigraEDA) |
-| Install | `pip install -e ".[dev]"` (Python 3.10+, single pure-Python runtime dependency: olefile) |
+| Install | `pip install migraeda` (Python 3.10+, single pure-Python runtime dependency: olefile) |
 | License | [MIT](LICENSE) |
 | Version | 0.1.0 |
 
@@ -111,6 +112,12 @@ Conversion and verification run in the same command. The output is parsed with t
 Written `.SchDoc` and `.PcbDoc` files are ASCII. Altium Designer opens them directly. Binary `.PcbDoc` can be read, not written.
 
 ## Install and quick start
+
+```bash
+pip install migraeda
+```
+
+For development, install from source:
 
 ```bash
 git clone https://github.com/Apollo-lwx/MigraEDA.git
@@ -341,7 +348,7 @@ pytest -q
 A local stdio server for clients such as Cursor and WorkBuddy. Design files are read and written only on the machine that runs the process. There is no remote endpoint.
 
 ```bash
-pip install -e ".[mcp]"
+pip install "migraeda[mcp]"
 ```
 
 `mcp.json` (project or user config in Cursor; `~/.workbuddy/mcp.json` in WorkBuddy):

@@ -7,6 +7,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
   <a href="https://www.python.org/downloads/"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg"></a>
+  <a href="https://pypi.org/project/migraeda/"><img alt="PyPI" src="https://img.shields.io/pypi/v/migraeda"></a>
   <a href="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Apollo-lwx/MigraEDA/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/Apollo-lwx/MigraEDA"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Apollo-lwx/MigraEDA?style=flat"></a>
 </p>
@@ -14,7 +15,7 @@
 | | |
 |---|---|
 | 仓库 | [github.com/Apollo-lwx/MigraEDA](https://github.com/Apollo-lwx/MigraEDA) |
-| 安装 | `pip install -e ".[dev]"`（Python 3.10+，运行时只依赖 olefile 一个纯 Python 小包） |
+| 安装 | `pip install migraeda`（Python 3.10+，运行时只依赖 olefile 一个纯 Python 小包） |
 | 许可 | [MIT](LICENSE) |
 | 当前版本 | 0.1.0 |
 
@@ -111,6 +112,12 @@ loop-verify: common_pins=367 mismatched=2 nets_matched=115
 写出的 `.SchDoc` / `.PcbDoc` 是 ASCII，Altium Designer 可以直接打开。二进制 PcbDoc 只读不写。
 
 ## 安装与快速开始
+
+```bash
+pip install migraeda
+```
+
+参与开发则从源码安装：
 
 ```bash
 git clone https://github.com/Apollo-lwx/MigraEDA.git
@@ -341,7 +348,7 @@ pytest -q
 本机 stdio 服务，给 Cursor、WorkBuddy 这类客户端调用。设计文件只在运行这条命令的电脑上读写，没有远程接口。
 
 ```bash
-pip install -e ".[mcp]"
+pip install "migraeda[mcp]"
 ```
 
 `mcp.json`（Cursor 用项目或用户配置，WorkBuddy 用 `~/.workbuddy/mcp.json`）：
